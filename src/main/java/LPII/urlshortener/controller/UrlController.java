@@ -2,9 +2,8 @@ package LPII.urlshortener.controller;
 
 import LPII.urlshortener.controller.dto.ShortUrlRequest;
 import LPII.urlshortener.controller.dto.ShortUrlResponse;
-import LPII.urlshortener.entities.UrlEntity;
-import LPII.urlshortener.repository.UrlRepository;
-import LPII.urlshortener.service.SequenceGenerator;
+import LPII.urlshortener.controller.entities.Url;
+import LPII.urlshortener.controller.repositories.UrlRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.hashids.Hashids;
 import org.springframework.http.HttpHeaders;
@@ -14,69 +13,126 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.LocalDateTime;
+import java.util.logging.Logger;
 
-// TODO: Configure a more restrictive CORS policy in a production environment
 @RestController
+@CrossOrigin(origins = "*") 
 public class UrlController {
 
-    private final UrlRepository urlRepository;
-    private final Hashids hashids;
-    private final SequenceGenerator sequenceGenerator;
+    private static final Logger logger = Logger.getLogger(UrlController.class.getName());
 
-    public UrlController(UrlRepository urlRepository, Hashids hashids, SequenceGenerator sequenceGenerator) {
-        this.urlRepository = urlRepository;
+    private final Hashids hashids;
+    private final UrlRepository urlRepository;
+
+    public UrlController(Hashids hashids, UrlRepository urlRepository) {
         this.hashids = hashids;
-        this.sequenceGenerator = sequenceGenerator;
+        this.urlRepository = urlRepository;
     }
 
     @PostMapping(value = "/shorten-url")
-    public ResponseEntity<ShortUrlResponse> shortenUrl(@RequestBody ShortUrlRequest shortUrlRequest, HttpServletRequest servletRequestrequest) {
-        var urlEntity = new UrlEntity();
-        urlEntity.setFullurl(shortUrlRequest.url());
-        urlEntity.setExpiredAt(LocalDateTime.now().plusHours(1));
+    public ResponseEntity<ShortUrlResponse> shortenUrl(@RequestBody ShortUrlRequest shortUrlRequest, HttpServletRequest servletRequest) {
+        try {
+            String originalUrl = shortUrlRequest.url();
 
-        urlEntity.setId(sequenceGenerator.generateSequence(UrlEntity.SEQUENCE_NAME));
+            // Validação de entrada
+            if (originalUrl == null || originalUrl.trim().isEmpty()) {
+                logger.warning("Attempt to shorten empty URL");
+                return ResponseEntity.badRequest().build();
+            }
 
-        var hash = hashids.encode(urlEntity.getId());
-        urlEntity.setHash(hash);
+            String trimmedUrl = originalUrl.trim();
 
-        urlRepository.save(urlEntity);
+            // Validar formato da URL
+            if (!isValidUrl(trimmedUrl)) {
+                logger.warning("Invalid URL format: " + trimmedUrl);
+                return ResponseEntity.badRequest().build();
+            }
 
-        var redirectUrl = ServletUriComponentsBuilder
-                .fromRequestUri(servletRequestrequest)
-                .replacePath("/{hash}")
-                .buildAndExpand(hash)
-                .toUriString();
+            // Gerar hash único
+            String hash = hashids.encode(System.currentTimeMillis());
+            LocalDateTime expirationTime = LocalDateTime.now().plusHours(1);
 
-        return ResponseEntity.ok(new ShortUrlResponse(redirectUrl));
+            // Salvar no MongoDB
+            Url urlEntity = new Url(hash, trimmedUrl, expirationTime);
+            urlRepository.save(urlEntity);
 
+            var redirectUrl = ServletUriComponentsBuilder
+                    .fromRequestUri(servletRequest)
+                    .replacePath("/{hash}")
+                    .buildAndExpand(hash)
+                    .toUriString();
+
+            logger.info("URL shortened successfully: " + hash + " -> " + trimmedUrl);
+            return ResponseEntity.ok(new ShortUrlResponse(redirectUrl));
+
+        } catch (Exception e) {
+            logger.severe("Error shortening URL: " + e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
+    private boolean isValidUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return false;
+        }
 
+        try {
+            URI uri = new URI(url);
+            if (uri.getScheme() == null) {
+                return false;
+            }
+            String scheme = uri.getScheme().toLowerCase();
+            return "http".equals(scheme) || "https".equals(scheme);
+        } catch (URISyntaxException e) {
+            return false;
+        }
+    }
 
     @GetMapping("/{hash}")
     public ResponseEntity<Void> redirect(@PathVariable String hash) {
+        try {
+            if (hash == null || hash.trim().isEmpty()) {
+                logger.warning("Empty hash requested");
+                return ResponseEntity.notFound().build();
+            }
 
-        var decodedHash = hashids.decode(hash);
-        if (decodedHash.length == 0) {
-            return ResponseEntity.notFound().build();
+            String trimmedHash = hash.trim();
+
+            // Buscar no MongoDB
+            var urlOptional = urlRepository.findById(trimmedHash);
+
+            if (urlOptional.isEmpty()) {
+                logger.warning("Hash not found: " + trimmedHash);
+                return ResponseEntity.notFound().build();
+            }
+
+            Url urlEntity = urlOptional.get();
+
+            // Verificar se expirou
+            if (urlEntity.getExpiredAt().isBefore(LocalDateTime.now())) {
+                logger.info("Expired URL accessed: " + trimmedHash);
+                urlRepository.delete(urlEntity);
+                return ResponseEntity.notFound().build();
+            }
+
+            String originalUrl = urlEntity.getFullUrl();
+
+            if (!isValidUrl(originalUrl)) {
+                logger.severe("Invalid stored URL for hash: " + trimmedHash);
+                return ResponseEntity.notFound().build();
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setLocation(URI.create(originalUrl));
+
+            logger.info("Redirecting: " + trimmedHash + " -> " + originalUrl);
+            return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
+
+        } catch (Exception e) {
+            logger.severe("Error redirecting hash " + hash + ": " + e.getMessage());
+            return ResponseEntity.internalServerError().build();
         }
-
-        var id = decodedHash[0];
-
-        var url = urlRepository.findById(id);
-
-        if (url.isEmpty() || url.get().getExpiredAt().isBefore(LocalDateTime.now())) {
-            return ResponseEntity.notFound().build();
-        }
-
-        HttpHeaders headers = new HttpHeaders();
-
-        headers.setLocation(URI.create(url.get().getFullUrl()));
-
-        return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
-
     }
-
 }

@@ -1,132 +1,62 @@
-# Encurtador de URL
+# URLShortener
 
-Este é um serviço de encurtamento de URL construído com Spring Boot e MongoDB. Ele permite aos usuários converter URLs longas em URLs curtas e memoráveis, com expiração automática.
+Uma aplicação web moderna para encurtamento de URLs, construída com Spring Boot. Converta URLs longas em identificadores curtos, únicos e memoráveis com expiração automática.
 
-## Funcionalidades
+## 🎯 Visão Geral
 
-*   **Encurtamento de URL:** Converte URLs longas em hashes curtos e exclusivos.
-*   **Expiração Automática:** URLs encurtadas expiram automaticamente e são removidas após 1 hora.
-*   **Geração de Hash Personalizada:** Usa Hashids para gerar hashes curtos, não sequenciais e exclusivos.
-*   **API RESTful:** Fornece uma API simples para encurtar e redirecionar URLs.
+URLShortener é um serviço RESTful que fornece encurtamento de URLs com segurança, validação rigorosa e expiração automática. Utiliza a biblioteca Hashids para gerar hashes curtos, não sequenciais e imprevisvéis, garantindo URLs únicas e seguras.
 
-## Tecnologias Utilizadas
+## ✨ Funcionalidades
 
-*   Java 25
-*   Spring Boot 3.5.7
-*   Gradle
-*   MongoDB
-*   Docker e Docker Compose
-*   Hashids
+- **Encurtamento Inteligente:** Converte URLs longas em hashes curtos e únicos usando Hashids
+- **Validação Robusta:** Valida o formato e o esquema (HTTP/HTTPS) das URLs
+- **Expiração Automática:** URLs encurtadas expiram automaticamente após 1 hora
+- **API RESTful:** Interface simples para integração com outras aplicações
+- **Interface Web:** Frontend intuitivo para usuários finais
+- **CORS Habilitado:** Suporta requisições de diferentes origens
+- **Logging Detalhado:** Registra todas as operações para auditoria
 
-## Pré-requisitos
+## 🛠️ Tecnologias
 
-Antes de começar, certifique-se de ter as seguintes ferramentas instaladas em sua máquina:
+| Componente | Versão |
+|-----------|--------|
+| Java | 21 |
+| Spring Boot | 3.5.7 |
+| Gradle | (wrapper) |
+| Hashids | 1.2.0 |
+| MongoDB | Latest |
+| Docker & Compose | Latest |
+| Thymeleaf | 3.1.x |
 
-*   **Java Development Kit (JDK) 25**
-*   **Gradle** (geralmente incluído com o wrapper do projeto)
-*   **Docker** e **Docker Compose**
+**Nota:** MongoDB está configurado no `docker-compose.yml`, mas a integração está atualmente comentada no `build.gradle`. O projeto usa armazenamento em memória com `ConcurrentHashMap`.
 
-## Primeiros Passos
+## 📋 Pré-requisitos
 
-### 1. Iniciar MongoDB com Docker Compose
+- **Java Development Kit (JDK) 21+**
+- **Docker & Docker Compose**
+- **Git** (para clonar o repositório)
 
-Este projeto usa MongoDB como seu banco de dados. Para iniciá-lo, navegue até a raiz do projeto e execute o seguinte comando:
+## 🚀 Instalação e Configuração
 
+### 1. Clonar o Repositório
+
+```bash
+git clone https://github.com/joaoMiguelSousaOliveira/shortener.git
+cd urlshortener
+```
+### 2. Configurar as variáveis do ambiente
+```bash
+MONGODB_USERNAME=admin
+MONGODB_PASSWORD=seu_senha_segura
+```
+### 3. Iniciar MongoDB
 ```bash
 docker compose -f docker/docker-compose.yml up -d
 ```
-
-Este comando iniciará um contêiner MongoDB em segundo plano, expondo-o na porta `27017`.
-
-### 2. Configuração da Aplicação
-
-A aplicação Spring Boot se conecta ao MongoDB usando credenciais definidas em um arquivo `.env` e configurações em `src/main/resources/application.properties`.
-
-Crie um arquivo `.env` no diretório `docker/` com suas credenciais MongoDB. Por exemplo:
-
+O MongoDB estará disponível em localhost:27017.
+### 4. Configurar `application.properties`
 ```
-MONGODB_USERNAME=seu_usuario
-MONGODB_PASSWORD=sua_senha
-```
-
-Certifique-se de que `src/main/resources/application.properties` tenha as seguintes configurações para MongoDB e a porta do servidor:
-
-```properties
-spring.data.mongodb.host=localhost
-spring.data.mongodb.port=27017
-spring.data.mongodb.database=shortenerdb
-spring.data.mongodb.username=${MONGODB_USERNAME}
-spring.data.mongodb.password=${MONGODB_PASSWORD}
+spring.application.name=urlshortener
 server.port=8081
-hashids.salt=sua_chave_secreta_aqui # IMPORTANTE: Mude para uma chave secreta forte e única
+hashids.salt=A-R-aNd0m-PhR4s3-With_Symbol5_AnD-NuMb3r5_T0_M4k3_It_Str0nG_G_G
 ```
-**IMPORTANTE:** Para `hashids.salt`, substitua `sua_chave_secreta_aqui` por uma string secreta forte e única. Este "salt" é crucial para a segurança e exclusividade das suas URLs curtas geradas.
-
-## Executando a Aplicação
-
-Após configurar o MongoDB, você pode iniciar a aplicação Spring Boot. Navegue até a raiz do projeto e execute:
-
-```bash
-./gradlew bootRun
-```
-
-A aplicação estará disponível em `http://localhost:8081`.
-
-## Endpoints da API
-
-### 1. Encurtar URL
-
-*   **POST /shorten-url**
-    *   **Descrição:** Encurta uma URL longa.
-    *   **Corpo da Requisição (JSON):**
-        ```json
-        {
-            "url": "https://www.example.com"
-        }
-        ```
-    *   **Exemplo de Resposta (JSON):**
-        ```json
-        {
-            "url": "http://localhost:8081/abcde"
-        }
-        ```
-
-### 2. Redirecionar URL
-
-*   **GET /{hash}**
-    *   **Descrição:** Redireciona para a URL original associada ao hash fornecido.
-    *   **Exemplo de Uso:** Acesse `http://localhost:8081/abcde` no seu navegador.
-
-### 3. Testar Conexão
-
-*   **GET /test**
-    *   **Descrição:** Um endpoint simples para verificar se a aplicação está funcionando.
-    *   **Exemplo de Resposta:** `O teste funcionou!`
-
-## Como Usar
-
-1.  **Iniciar MongoDB:**
-    ```bash
-    docker compose -f docker/docker-compose.yml up -d 
-    ```
-
-2.  **Iniciar a Aplicação Spring Boot:**
-    ```bash
-    ./gradlew bootRun
-    ```
-3.  **Encurtar uma URL:**
-    Use `curl` para enviar uma requisição POST:
-    ```bash
-    curl -X POST -H "Content-Type: application/json" -d '{"url": "https://www.google.com"}' http://localhost:8081/shorten-url
-    ```
-    Você receberá uma resposta com a URL encurtada.
-
-4.  **Acessar a URL Encurtada:**
-    Copie a `url` da resposta e cole-a no seu navegador para ser redirecionado para a URL original.
-
-5.  **Testar a Conexão (Opcional):**
-    Abra seu navegador ou use `curl`:
-    ```bash
-    curl http://localhost:8081/test
-    ```
-    Você deverá ver a mensagem: `O teste funcionou!`
