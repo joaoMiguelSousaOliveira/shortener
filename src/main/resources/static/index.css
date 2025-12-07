@@ -32,6 +32,8 @@ body {
     align-items: center;
     justify-content: center;
     gap: 12px;
+
+    position: relative;
 }
 
 .pear-icon {
@@ -98,10 +100,9 @@ p.subtitle {
     justify-content: center;
     align-items: center;
     border-radius: 100px;
-    position: absolute;
-    left: 50%;
-    top: 37%;
-    transform: translate(-50%, -50%);
+    margin: 5px auto 24px;
+    transform: translateY(-55px);
+
     
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
     font-size: 13px;
@@ -137,7 +138,7 @@ input::placeholder {
 }
 
 button {
-    background-color: #8CBF3F; /* Verde Pera */
+    background-color: #8CBF3F; 
     color: white;
     border: none;
     padding: 16px 32px;
